@@ -26,7 +26,11 @@ class DataGetter:
     def get_pair_data(self,pair,interval,limit=500):
         #TODO: nasıl getlemem gerektiğini bulmam lazım
         #return requests.get("https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval={interval}&limit={limit}")  bu 1. secenek
-        return 
+        """
+        r = requests.get("https://fapi.binance.com/fapi/v1/klines?symbol=BAKEUSDT&interval=1m&limit=500")
+        print(r.json())
+        bu çalışıyor
+        """
 
     def data(self,pair,interval,limit=500):
         return self.convert_to_df(requests.get("https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval={interval}&limit={limit}").json())
