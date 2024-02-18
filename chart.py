@@ -1,5 +1,6 @@
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 from pandas import Timestamp
 from sklearn.linear_model import LinearRegression
 
@@ -13,14 +14,20 @@ class Chart:
                 high=self.data['High'],
                 low=self.data['Low'],  
                 close=self.data['Close'],name="Candlesticks")
-        self.figure = go.Figure(self.candlesticks)        
+        self.figure = go.Figure(self.candlesticks)
+        self.line_name_list = []        
         
     def plot(self):
         self.figure.show()
 
-    def add_line(self,line_name,*args):
-        #args 0 ve 1 dtype: 
+    def add_line(self,line_name,*args,mode="Low"):
+        # args 0, 1 dtype: int, index
+        # args 2, 3 dtype: np.float64 price of a candlestick 
+        line_color = dict(color='green')
+        if mode == "High":
+            line_color = dict(color='red') 
         line = go.Scatter(x=[args[0], args[1]], y=[args[2], args[3]], mode='lines', line=dict(color='green'), name=line_name)
+        self.line_name_list.append(line_name)
         self.figure.add_trace(line)
 
     def delete_line(self,line_name):
@@ -31,13 +38,34 @@ class Chart:
     #Fonksiyonu swing high ve swing lowlara göre yapmaya çalışayım ki daha net trendlinelar belirlesin
 
     #Swing H-L yapmadan da lineın kesiştiği yere kadar devam ettirip ona göre lineın slopeunu yavaş yavaş azaltarak optimize edebilirim
-    def gradient_descent(self, data):
-        #0 slope 1 intercept
-        X = data["Low"].index.values.reshape(-1,1)
-        y = data["Low"]
-        linear_regression = LinearRegression()
-        linear_regression.fit(X,y)
-        return [linear_regression.coef_[0], linear_regression.intercept_]
+
+    #TODO: line opt eğer elimdeki bütün datada çizilen bir line varsa doğru çalışıyor çünkü 
+    def line_opt(self,line,data_in,mode="Low"):
+        """
+        line: list containing slope [0] and intercept [1] of a  line
+        """
+        dif_list = data_in[mode] - (line[0]*data_in[mode]+line[1])
+        min_dif_idx = dif_list.argmin()
+        min_dif = dif_list.iloc[min_dif_idx]
+        return [(min_dif/min_dif_idx) - line[0] , line[1]] 
+        
+    
+    def gradient_descent(self, data_in,mode_in="Low"):
+        """
+        data_in = pd dataframe
+                  ["Low"] ya da başka bir şey kullanma, mode input alan bütün fonksiyonlara dataframe girdisi yap
+        """
+        
+        X = (data_in["Open Time"].astype(np.int64) // (9 * 10**11)) # Eğer (9 * 10 ** 11) bunla bölersek 1970 tarihi returnlüyo , - (data_in["Open Time"].iloc[0] // (9 * 10**11)
+                                                                    #                                                               yaparsak da indexleri float olarak veriyor
+                                                                    # pd.to_datetime kullanabilmek için (9 * 10 ** 11) ile çarpmak lazım
+
+        y = data_in[mode_in]
+        line_a = (data.iloc[-1]["Low"] - data.iloc[0]["Low"]) / ((data.iloc[499]["Close Time"] - data.iloc[200]["Open Time"]).value) * 9 * 10**11
+        line_b = data.iloc[200]["Low"]
+        #return self.line_opt([linear_regression.coef_[0], linear_regression.intercept_],data_in = data_in,mode=mode_in)
+        
+        
     
     #TODO: Herhangi bir candlestickin open-close arasından geçiyor bir line onun kontrolünü yapan fonksiyon
     def check_oc_collision_of_single_candlestick(self,arg,line,mode="Open Time"):
@@ -98,5 +126,12 @@ class Chart:
     
 
     #TODO: Trend Çizme
-    #def auto_draw_line(self,begin,end):
-        
+    def auto_draw_line(self,data_in, begin = 0,end = 499, mode = "Low"):
+        #TODO: trend başlagngıç ve bitiş mumları bulma fonksiyonu, onları yazana kadar begin ve end parametreleri kalacak
+
+        if max(data_in.index.values.reshape(-1,1)) < 499:
+            end = data_in.iloc[-1].index.values.reshape(-1,1) 
+        data_to_be_processed = data_in.iloc[begin:end+1]
+        line = self.gradient_descent(data_in=data_to_be_processed,mode_in = mode)
+        self.add_line("test_auto_draw", data_in.iloc[begin]["Open Time"], data_in.iloc[end]["Close Time"],data_in.iloc[begin][mode],data_in.iloc[end][mode])
+        #self.data[self.data["Open Time"] == data_in.iloc[end]["Low"]].index
