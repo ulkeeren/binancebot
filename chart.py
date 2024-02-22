@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 from pandas import Timestamp
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MinMaxScaler
+
 
 
 class Chart:
-    #TODO: candlestick verisi input alacak fonksiyonlar için standart bir input proseduru yaz 
     def __init__(self,data):
         self.data = data
         self.candlesticks = go.Candlestick(x=self.data['Open Time'],
@@ -21,51 +22,55 @@ class Chart:
         self.figure.show()
 
     def add_line(self,line_name,*args,mode="Low"):
-        # args 0, 1 dtype: int, index
-        # args 2, 3 dtype: np.float64 price of a candlestick 
         line_color = dict(color='green')
         if mode == "High":
             line_color = dict(color='red') 
         line = go.Scatter(x=[args[0], args[1]], y=[args[2], args[3]], mode='lines', line=dict(color='green'), name=line_name)
         self.line_name_list.append(line_name)
         self.figure.add_trace(line)
+        self.figure.update_layout(showlegend=True)
+
+    def add_line_2_candles(self, candle_1,candle_2,mode="Low",line_name="porno"):
+        line_color = dict(color='green')
+        if mode == "High":
+            line_color = dict(color='red') 
+        line = go.Scatter(x=[candle_1["Open Time"], candle_2["Close Time"]], y=[candle_1["Low"], candle_2["Low"]], mode='lines', line=dict(color='green'), name=line_name)
+        self.line_name_list.append(line_name)
+        self.figure.add_trace(line)
+
+    def draw_line_between_dates(self, candle_1,candle_2,mode = "Low"):
+        self.add_line("t1",candle_1["Open Time"],candle_2["Open Time"],candle_1[mode], candle_2[mode])
+        
+    def add_vertical_line(self,candle_1,candle_2,value,line_name = "vertical line"):
+        self.add_line(line_name, candle_1["Open Time"],candle_2["Open Time"],value,value)
+        self.line_name_list.append(line_name)
+
 
     def delete_line(self,line_name):
         self.figure.data = [trace for trace in self.figure.data if trace.name != line_name]
     
-    #TODO: Gradient Descent fonksiyonu
-
-    #Fonksiyonu swing high ve swing lowlara göre yapmaya çalışayım ki daha net trendlinelar belirlesin
-
-    #Swing H-L yapmadan da lineın kesiştiği yere kadar devam ettirip ona göre lineın slopeunu yavaş yavaş azaltarak optimize edebilirim
-
-    #TODO: line opt eğer elimdeki bütün datada çizilen bir line varsa doğru çalışıyor çünkü 
+    
+    
     def line_opt(self,line,data_in,mode="Low"):
-        """
-        line: list containing slope [0] and intercept [1] of a  line
-        """
+        #line: list containing slope [0] and intercept [1] of a  line
         dif_list = data_in[mode] - (line[0]*data_in[mode]+line[1])
         min_dif_idx = dif_list.argmin()
         min_dif = dif_list.iloc[min_dif_idx]
         return [(min_dif/min_dif_idx) - line[0] , line[1]] 
+    
+    
+    def init_line(self, data_in,mode_in="Low"):
+        #TODO: gives a decent line but needs optimization
+        reg = LinearRegression()
+        #X=np.arange(len(data_in)).reshape(-1, 1)
+        X=data_in["Index"].values.reshape(-1, 1)
+        y=data_in[mode_in].values.reshape(-1,1)
+        reg.fit(X,y)
+        return reg.coef_[0][0],reg.intercept_[0]
         
     
-    def gradient_descent(self, data_in,mode_in="Low"):
-        """
-        data_in = pd dataframe
-                  ["Low"] ya da başka bir şey kullanma, mode input alan bütün fonksiyonlara dataframe girdisi yap
-        """
-        
-        X = (data_in["Open Time"].astype(np.int64) // (9 * 10**11)) # Eğer (9 * 10 ** 11) bunla bölersek 1970 tarihi returnlüyo , - (data_in["Open Time"].iloc[0] // (9 * 10**11)
-                                                                    #                                                               yaparsak da indexleri float olarak veriyor
-                                                                    # pd.to_datetime kullanabilmek için (9 * 10 ** 11) ile çarpmak lazım
+    
 
-        y = data_in[mode_in]
-        line_a = (data.iloc[-1]["Low"] - data.iloc[0]["Low"]) / ((data.iloc[499]["Close Time"] - data.iloc[200]["Open Time"]).value) * 9 * 10**11
-        line_b = data.iloc[200]["Low"]
-        #return self.line_opt([linear_regression.coef_[0], linear_regression.intercept_],data_in = data_in,mode=mode_in)
-        
-        
     
     #TODO: Herhangi bir candlestickin open-close arasından geçiyor bir line onun kontrolünü yapan fonksiyon
     def check_oc_collision_of_single_candlestick(self,arg,line,mode="Open Time"):
@@ -87,7 +92,7 @@ class Chart:
         idx = 0
         #dataframe row case
         if type(arg) == "pandas.core.series.Series":
-            idx = self.data[self.data["Open Time"] == arg["Open Time"]].index
+            idx = self.data[self.data["Open Time"] == arg["Open Time"]]["Index"]
 
         #int case
         elif type(arg) == "int":
@@ -111,27 +116,39 @@ class Chart:
 
         return collision_list
 
-
-        
-
-    #TODO: Swing High ve Swing Low bulma
-    #Swingleri etraftaki kaç muma göre arayacağıma karar vermem lazım, onu da range parametresiyle ayarlarım,
-    #ilerde belki modele feedleyeceğim zaman bikaç rangede buldurur ve pcaini aldırırım
-    def find_swings(self,range):
-        for index,row in self.data.iterrows():
-            print(candlestick)
-
-        
-    #TODO: Support ve Resistance Çizme
+    def low_swings(self,data_in,order=2):
+        low_swing_list = []
+        for i in range(order,len(data_in)-order):
+            flag = True
+            for j in range(1,order+1):
+                if data_in.iloc[i]["Low"] > data_in.iloc[i+j]["Low"] or data_in.iloc[i]["Low"] > data_in.iloc[i-j]["Low"]:
+                    flag=False
+                    break
+            if flag == True:
+                low_swing_list.append(data_in.iloc[i]["Index"])
+            
+        return low_swing_list
     
+    def high_swings(self,data_in,order=2):
+        high_swing_list = []
+        for i in range(order,len(data_in)-order):
+            flag = True
+            for j in range(1,order+1):
+                if data_in.iloc[i]["High"] < data_in.iloc[i+j]["High"] or data_in.iloc[i]["High"] < data_in.iloc[i-j]["High"]:
+                    flag=False
+                    break
+            if flag == True:
+                high_swing_list.append(data_in.iloc[i]["Index"])
+            
+        return high_swing_list
+    #TODO: line grafikte gözükmüyor, onu çöz
+    
+    def draw_support(self,data_in,order=15):
+        sup_list=[]
+        smallest_15 = data_in.nsmallest(order,"Low")
+        average_order = np.sum(smallest_15["Low"].values.reshape(-1,1)) / order
+        self.add_vertical_line(smallest_15.nsmallest(1,"Index").iloc[0],smallest_15.nlargest(1,"Index").iloc[0],average_order)
 
-    #TODO: Trend Çizme
-    def auto_draw_line(self,data_in, begin = 0,end = 499, mode = "Low"):
-        #TODO: trend başlagngıç ve bitiş mumları bulma fonksiyonu, onları yazana kadar begin ve end parametreleri kalacak
 
-        if max(data_in.index.values.reshape(-1,1)) < 499:
-            end = data_in.iloc[-1].index.values.reshape(-1,1) 
-        data_to_be_processed = data_in.iloc[begin:end+1]
-        line = self.gradient_descent(data_in=data_to_be_processed,mode_in = mode)
-        self.add_line("test_auto_draw", data_in.iloc[begin]["Open Time"], data_in.iloc[end]["Close Time"],data_in.iloc[begin][mode],data_in.iloc[end][mode])
-        #self.data[self.data["Open Time"] == data_in.iloc[end]["Low"]].index
+
+            

@@ -14,6 +14,7 @@ class DataGetter:
         data_df['Open Time'] = pd.to_datetime(data_df['Open Time'], unit='ms')
         data_df['Close Time'] = pd.to_datetime(data_df["Close Time"],unit='ms').dt.ceil("min")
         return data_df
+        
     #TODO: Kullanılmıyor şu anda, kullanilabilir hale sonra getiririm
     def get_valid_pairs(self):
         exchange_info_endpoint = self.base_endpoint + "/fapi/v1/exchangeInfo"
