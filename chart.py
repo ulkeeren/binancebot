@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 from pandas import Timestamp
+from data_ops import DataGetter
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler
 
@@ -10,6 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 class Chart:
     def __init__(self,data):
         self.data = data
+        self.data_getter = DataGetter(api_key=0,api_secret=0)
         self.candlesticks = go.Candlestick(x=self.data['Open Time'],
                 open=self.data['Open'],
                 high=self.data['High'],
@@ -25,7 +27,7 @@ class Chart:
         line_color = dict(color='green')
         if mode == "High":
             line_color = dict(color='red') 
-        line = go.Scatter(x=[args[0], args[1]], y=[args[2], args[3]], mode='lines', line=dict(color='green'), name=line_name)
+        line = go.Scatter(x=[args[0], args[1]], y=[args[2], args[3]], mode='lines', line=line_color, name=line_name)
         self.line_name_list.append(line_name)
         self.figure.add_trace(line)
         self.figure.update_layout(showlegend=True)
@@ -41,15 +43,18 @@ class Chart:
     def draw_line_between_dates(self, candle_1,candle_2,mode = "Low"):
         self.add_line("t1",candle_1["Open Time"],candle_2["Open Time"],candle_1[mode], candle_2[mode])
         
-    def add_vertical_line(self,candle_1,candle_2,value,line_name = "vertical line"):
-        self.add_line(line_name, candle_1["Open Time"],candle_2["Open Time"],value,value)
+    def add_horizontal_line(self,candle_1,candle_2,value,line_name = "vertical line",mode_in = "Low"):
+        self.add_line(line_name, candle_1["Open Time"],candle_2["Open Time"],value,value,mode=mode_in)
         self.line_name_list.append(line_name)
 
 
     def delete_line(self,line_name):
         self.figure.data = [trace for trace in self.figure.data if trace.name != line_name]
     
-    
+    def clear_chart(self):
+        for lname in self.line_name_list:
+            if lname!="Candlesticks":
+                self.delete_line(lname)
     
     def line_opt(self,line,data_in,mode="Low"):
         #line: list containing slope [0] and intercept [1] of a  line
@@ -141,13 +146,21 @@ class Chart:
                 high_swing_list.append(data_in.iloc[i]["Index"])
             
         return high_swing_list
-    #TODO: line grafikte gözükmüyor, onu çöz
+    """
+    def draw_support(self,data_in):
+        begin,end,value = self.data_getter.find_support(data_in)
+        self.add_horizontal_line(begin,end,value)
+
+    def draw_resistance(self,data_in):
+        begin,end,value = self.data_getter.find_resistance(data_in)
+        self.add_horizontal_line(begin,end,value)
+    """
+    def draw_sr(self,data_in,order=15,chunk_size=100):
+        support_info, resistance_info = self.data_getter.find_sr_info(data_in)
+        for sup,res in zip(support_info["chunk_begins_n_ends"], resistance_info["chunk_begins_n_ends"]):
+            self.add_horizontal_line(sup[0],sup[1],sup[2])
+            self.add_horizontal_line(res[0],res[1],res[2],mode_in="High")
     
-    def draw_support(self,data_in,order=15):
-        sup_list=[]
-        smallest_15 = data_in.nsmallest(order,"Low")
-        average_order = np.sum(smallest_15["Low"].values.reshape(-1,1)) / order
-        self.add_vertical_line(smallest_15.nsmallest(1,"Index").iloc[0],smallest_15.nlargest(1,"Index").iloc[0],average_order)
 
 
 
