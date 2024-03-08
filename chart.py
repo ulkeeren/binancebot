@@ -7,7 +7,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler
 
 
-
 class Chart:
     def __init__(self,data):
         self.data = data
@@ -20,6 +19,12 @@ class Chart:
         self.figure = go.Figure(self.candlesticks)
         self.line_name_list = []        
         
+    ########################################################################
+    ########################################################################
+    ################LINE DRAWING - DELETING FUNCTIONS#######################
+    ########################################################################
+    ########################################################################
+    
     def plot(self):
         self.figure.show()
 
@@ -55,6 +60,12 @@ class Chart:
         for lname in self.line_name_list:
             if lname!="Candlesticks":
                 self.delete_line(lname)
+    ########################################################################
+    ########################################################################
+    ################LINE DRAWING - DELETING FUNCTIONS#######################
+    ########################################################################
+    ########################################################################
+
     
     def line_opt(self,line,data_in,mode="Low"):
         #line: list containing slope [0] and intercept [1] of a  line
@@ -161,7 +172,25 @@ class Chart:
             self.add_horizontal_line(sup[0],sup[1],sup[2])
             self.add_horizontal_line(res[0],res[1],res[2],mode_in="High")
     
-
-
-
+    def draw_ema(self,data_in,mode_in = "Low" , order = 15):
+        dates,line_values = self.data_getter.ema(data_in,mode_in,order)
+        self.figure.add_trace(go.Scatter(x=dates, y=line_values, mode='lines',name = f"ema{order}" ))
+        self.figure.update_layout(showlegend=True)
+    def draw_atr(self,data_in,lenght_in):
+        #TODO:
+        pass
+    def draw_bb(self,data_in,lenght_in):
+        #TODO:
+        pass
+    def draw_donchian(self,data_in, lenght_in):
+        #TODO:
+        #DCL_14_14  DCM_14_14  DCU_14_14
+        df = self.data_getter.donchian(data_in,lenght_in)
+        df["Open Time"] = self.data["Open Time"]
+        self.figure.add_trace(go.Scatter(x=df["Open Time"], y=df["DCL_14_14"].values, mode='lines',name = "donchian low" + str( lenght_in) ,line =dict(color='green')))
+        self.figure.add_trace(go.Scatter(x=df["Open Time"], y=df["DCU_14_14"].values, mode='lines',name = "donchian high" + str( lenght_in) ,line =dict(color='red')))
+        self.figure.update_layout(showlegend=True)
+        pass
+    
+    
             

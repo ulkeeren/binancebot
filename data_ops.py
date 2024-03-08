@@ -1,6 +1,9 @@
 from binance.um_futures import UMFutures
 import requests
 import pandas as pd
+from pandas_ta.volatility import atr
+from pandas_ta.volatility import donchian
+from pandas_ta.volatility import bbands
 import numpy as np
 from pandas import Timestamp
 from sklearn.linear_model import LinearRegression
@@ -147,6 +150,7 @@ class DataGetter:
             
         return support_info, resistance_info
 
+    
     """
     def get_pair_data(self,pair,interval,limit=500):
         #TODO: nasıl getlemem gerektiğini bulmam lazım
@@ -159,3 +163,20 @@ class DataGetter:
         return self.convert_to_df(requests.get("https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval={interval}&limit={limit}").json())
     """
     
+    def ema(self,data_in,mode_in="Low", order = 15):
+        line_values = []
+        dates = []
+        c=1
+        for idx in range(order,len(data_in)):
+            t=0       
+            for value in data_in.iloc[ idx-order : idx ][mode_in]:
+               t += value
+            line_values.append(t // order)
+            dates.append(data_in.iloc[idx]["Open Time"])
+        return dates,line_values
+    def atr(self,data_in,lenght=14):
+        return atr(data_in["High"],data_in["Low"],data_in["Close"],lenght = 21 )
+    def Bollinger(self,data_in,lenght_in=14):
+        return bbands(data_in["Close"],length=lenght_in)
+    def donchian(self,data_in,lenght=14):
+        return donchian(data_in["High"],data_in["Low"],upper_length=lenght, lower_length=lenght)
