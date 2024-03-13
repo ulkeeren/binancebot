@@ -1,0 +1,41 @@
+change = [1]
+    longside = []
+    shortside = []
+    average_long = 0
+    average_short = 0
+    for i,row in data_in.iterrows():
+        pnl = 0
+        if i in rdf.index:
+            if not pd.isna(rdf.loc[i]["exit"]):
+                if len(longside) > 0:
+                    pnl = ((donchian_df.loc[i]["DCM_14_14"] - average_long) / average_long) * 100 
+                    longside.clear()
+                    average_long = 0
+                if len(shortside) > 0:
+                    pnl = ((average_short - donchian_df.loc[i]["DCM_14_14"] ) / average_short) * 100 
+                    shortside.clear()
+                    average_short = 0
+
+            elif not pd.isna(rdf.loc[i]["long_entries"]):
+                longside.append(donchian_df.loc[i]["DCU_14_14"])
+                average_long = np.sum(longside)/len(longside)
+                pnl = ((donchian_df.loc[i]["DCU_14_14"] - average_long) / average_long) * 100
+
+            elif not pd.isna(rdf.loc[i]["short_entries"]):
+                shortside.append(donchian_df.loc[i]["DCL_14_14"])
+                average_short = np.sum(shortside)/len(shortside)
+                pnl = ((average_short - donchian_df.loc[i]["DCL_14_14"]) / average_short) * 100
+
+
+        elif average_long > 0:
+            pnl = ((data_in.loc[i]["Close"] - average_long) / average_long) * 100
+        elif average_short > 0:
+            pnl = ((average_short - data_in.loc[i]["Close"]) / average_short) * 100
+
+        change.append(1+pnl)
+
+    change.pop(0)
+    returns = pd.DataFrame()
+    returns["Open Time"] = data_in["Open Time"]
+    returns["PnL"] = change 
+    return rdf,returns

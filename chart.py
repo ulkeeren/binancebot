@@ -181,6 +181,7 @@ class Chart:
         pass
     def draw_bb(self,data_in,lenght_in):
         #TODO:
+        #BBL_14_2.0	BBM_14_2.0	BBU_14_2.0	BBB_14_2.0	BBP_14_2.0
         pass
     def draw_donchian(self,data_in, lenght_in):
         #TODO:

@@ -23,6 +23,14 @@ class DataGetter:
         data_df['Close Time'] = pd.to_datetime(data_df["Close Time"],unit='ms').dt.ceil("min")
         data_df["Index"] = np.arange(len(data))
         return data_df.drop("Ignore",axis=1)
+    
+    def backtesting_preprocessing(self,data_in):
+        returnDF = data_in[["Open","High","Low","Close","Volume","Open Time"]].set_index("Open Time")
+        returnDF.index.name=""
+        #returnDF["Open Time"] = returnDF.index.values
+        return returnDF
+        
+
         
     def get_valid_pairs(self):
         exchange_info_endpoint = self.base_endpoint + "/fapi/v1/exchangeInfo"
@@ -174,9 +182,9 @@ class DataGetter:
             line_values.append(t // order)
             dates.append(data_in.iloc[idx]["Open Time"])
         return dates,line_values
-    def atr(self,data_in,lenght=14):
-        return atr(data_in["High"],data_in["Low"],data_in["Close"],lenght = 21 )
-    def Bollinger(self,data_in,lenght_in=14):
-        return bbands(data_in["Close"],length=lenght_in)
-    def donchian(self,data_in,lenght=14):
-        return donchian(data_in["High"],data_in["Low"],upper_length=lenght, lower_length=lenght)
+    def atr(self,data_in,window=14):
+        return atr(data_in["High"],data_in["Low"],data_in["Close"],lenght = window )
+    def Bollinger(self,data_in,window=14):
+        return bbands(data_in["Close"],length=window)
+    def donchian(self,data_in,window=14):
+        return donchian(data_in["High"],data_in["Low"],upper_length=window, lower_length=window)
