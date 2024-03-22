@@ -4,6 +4,7 @@ import pandas as pd
 from pandas_ta.volatility import atr
 from pandas_ta.volatility import donchian
 from pandas_ta.volatility import bbands
+from pandas_ta.overlap import supertrend
 import numpy as np
 from pandas import Timestamp
 from sklearn.linear_model import LinearRegression
@@ -37,7 +38,7 @@ class DataGetter:
         response = requests.get(exchange_info_endpoint)
         if response.status_code == 200:
             exchange_info = response.json()
-            return [symbol for symbol in exchange_info['symbols']]
+            return [symbol["symbol"] for symbol in exchange_info['symbols']]
 
     def get_pair_data(self,pair_in="BTCUSDT",interval_in="15m"):
         return self.convert_to_df(self.client.continuous_klines(pair_in,contractType="PERPETUAL", interval=interval_in))
@@ -158,14 +159,17 @@ class DataGetter:
             
         return support_info, resistance_info
 
+    def isIncreasing(self,data_in):
+        midPoints = (data_in["Close"] + data_in["Open"])/2
+
     
     """
     def get_pair_data(self,pair,interval,limit=500):
-        #TODO: nasıl getlemem gerektiğini bulmam lazım
-        #return requests.get("https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval={interval}&limit={limit}")  bu 1. secenek
-        #r = requests.get("https://fapi.binance.com/fapi/v1/klines?symbol=BAKEUSDT&interval=1m&limit=500")
-        #print(r.json())
-        #bu çalışıyor
+        
+        return requests.get("https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval={interval}&limit={limit}")  bu 1. secenek
+        r = requests.get("https://fapi.binance.com/fapi/v1/klines?symbol=BAKEUSDT&interval=1m&limit=500")
+        print(r.json())
+        bu çalışıyor
 
     def data(self,pair,interval,limit=500):
         return self.convert_to_df(requests.get("https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval={interval}&limit={limit}").json())
@@ -179,7 +183,7 @@ class DataGetter:
             t=0       
             for value in data_in.iloc[ idx-order : idx ][mode_in]:
                t += value
-            line_values.append(t // order)
+            line_values.append(t / order)
             dates.append(data_in.iloc[idx]["Open Time"])
         return dates,line_values
     def atr(self,data_in,window=14):
@@ -188,3 +192,6 @@ class DataGetter:
         return bbands(data_in["Close"],length=window)
     def donchian(self,data_in,window=14):
         return donchian(data_in["High"],data_in["Low"],upper_length=window, lower_length=window)
+    def superTrend(self,data_in,window=14):
+        return supertrend(data_in["High"],data_in["Low"],data_in["Close"],window)
+        

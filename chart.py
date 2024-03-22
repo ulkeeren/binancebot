@@ -183,6 +183,15 @@ class Chart:
         #TODO:
         #BBL_14_2.0	BBM_14_2.0	BBU_14_2.0	BBB_14_2.0	BBP_14_2.0
         pass
+    def draw_supertrend(self,data_in,lenght_in=14 ):
+        #SUPERT_14_3.0	SUPERTd_14_3.0	SUPERTl_14_3.0	SUPERTs_14_3.0
+        df = self.data_getter.superTrend(data_in,lenght_in)
+        df= df.iloc[lenght_in:]
+        df["Open Time"] = self.data["Open Time"]
+        self.figure.add_trace(go.Scatter(x=df["Open Time"], y=df["SUPERTl_14_3.0"].values, mode='lines',name = "Supertrend Long" + str( lenght_in) ,line =dict(color='green')))
+        self.figure.add_trace(go.Scatter(x=df["Open Time"], y=df["SUPERTs_14_3.0"].values, mode='lines',name = "Supertrend Short" + str( lenght_in) ,line =dict(color='red')))
+        self.figure.update_layout(showlegend=True)
+
     def draw_donchian(self,data_in, lenght_in):
         #TODO:
         #DCL_14_14  DCM_14_14  DCU_14_14
@@ -191,7 +200,7 @@ class Chart:
         self.figure.add_trace(go.Scatter(x=df["Open Time"], y=df["DCL_14_14"].values, mode='lines',name = "donchian low" + str( lenght_in) ,line =dict(color='green')))
         self.figure.add_trace(go.Scatter(x=df["Open Time"], y=df["DCU_14_14"].values, mode='lines',name = "donchian high" + str( lenght_in) ,line =dict(color='red')))
         self.figure.update_layout(showlegend=True)
-        pass
+
     
     
             
