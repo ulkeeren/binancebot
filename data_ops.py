@@ -186,12 +186,16 @@ class DataGetter:
             line_values.append(t / order)
             dates.append(data_in.iloc[idx]["Open Time"])
         return dates,line_values
+    
     def atr(self,data_in,window=14):
         return atr(data_in["High"],data_in["Low"],data_in["Close"],lenght = window )
+    
     def Bollinger(self,data_in,window=14):
         return bbands(data_in["Close"],length=window)
+    
     def donchian(self,data_in,window=14):
         return donchian(data_in["High"],data_in["Low"],upper_length=window, lower_length=window)
+    
     def superTrend(self,data_in,window=14):
         return supertrend(data_in["High"],data_in["Low"],data_in["Close"],window)
         
