@@ -80,10 +80,16 @@ def optimize_strat(data_in,range_in,strat):
     for i in range(range_in[0],range_in[1] + 1):
         s = strat(data_in,window=i)
         bt = backtest(data_in["Close"],s)
-        if bt.total_profit() > mp:
-            mpf = bt
-            mp = bt.total_profit()
-            window = i
+        try:
+            if bt.calmar_ratio() > mp:
+                mpf = bt
+                mp = bt.calmar_ratio()
+                window = i
+        except:
+            if bt.total_profit() > mp:
+                mpf = bt
+                mp = bt.total_profit()
+                window = i
     if mpf == 0:
         return "Bad Strategy","Bad Strategy"
     return mpf,window
