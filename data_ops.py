@@ -9,6 +9,7 @@ import numpy as np
 from pandas import Timestamp
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import MinMaxScaler
+import time
 
 class DataGetter:
     def __init__(self,api_key=0,api_secret=0 ):
@@ -17,6 +18,18 @@ class DataGetter:
         self.api_secret = api_secret
         if api_key != 0 and api_secret != 0:
             self.client = UMFutures("iPQMe46exUy10KiBaBahQT7ow1uzb9jaxlKj19Bg5BI8JEwJL5bw9LCvJtfKuVbP","J4FGJQdGPpNGm8jpnj3IuFuDJuAe7FIa3cM51L4z662UYux3qD0ByLJ0bfIltZvK")
+
+    def get_all_pair_data(self,**kwargs):
+
+        df = self.get_pair_data(**kwargs)
+        for i in range(100):
+            unix=self.datetime_to_unix(df["Open Time"])
+            df_before = self.get_pair_data("BTCUSDT",interval_in=kwargs["interval_in"],endTime=unix[0])
+            df=pd.concat([df_before,df],axis = 0)
+        return df
+
+    def get_pair_data(self,pair_in,interval_in,**kwargs):
+        return self.convert_to_df(self.client.continuous_klines(pair_in,contractType="PERPETUAL", interval=interval_in,limit=1000,**kwargs))
 
     def convert_to_df(self, data):
         data_df=pd.DataFrame(np.asarray(data,dtype=np.float64),columns=["Open Time","Open","High","Low","Close","Volume","Close Time","Quote Asset Volume","Number of Trades","Taker Buy Volume","Taker Buy Quote Asset Volume","Ignore"])
@@ -31,7 +44,8 @@ class DataGetter:
         #returnDF["Open Time"] = returnDF.index.values
         return returnDF
         
-
+    def datetime_to_unix(self,dates):
+        return (dates - pd.Timestamp("1970-01-01")) // pd.Timedelta('1ms')
         
     def get_valid_pairs(self):
         exchange_info_endpoint = self.base_endpoint + "/fapi/v1/exchangeInfo"
@@ -40,8 +54,7 @@ class DataGetter:
             exchange_info = response.json()
             return [symbol["symbol"] for symbol in exchange_info['symbols']]
 
-    def get_pair_data(self,pair_in="BTCUSDT",interval_in="15m"):
-        return self.convert_to_df(self.client.continuous_klines(pair_in,contractType="PERPETUAL", interval=interval_in))
+    
 
     def low_swings(self,data_in,order=2):
         low_swing_list = []
