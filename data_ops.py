@@ -1,6 +1,7 @@
 from binance.um_futures import UMFutures
 import requests
 import pandas as pd
+import os
 from pandas_ta.volatility import atr
 from pandas_ta.volatility import donchian
 from pandas_ta.volatility import bbands
@@ -22,15 +23,26 @@ class DataGetter:
     def get_all_pair_data(self,**kwargs):
 
         df = self.get_pair_data(**kwargs)
-        for i in range(100):
-            unix=self.datetime_to_unix(df["Open Time"])
-            df_before = self.get_pair_data("BTCUSDT",interval_in=kwargs["interval_in"],endTime=unix[0])
-            df=pd.concat([df_before,df],axis = 0)
+        while True:
+            try:
+                unix=self.datetime_to_unix(df["Open Time"])
+                df_before = self.get_pair_data("BTCUSDT",interval_in=kwargs["interval_in"],endTime=unix[0])
+                df=pd.concat([df_before,df],axis = 0)
+            except:
+                break
         return df
 
     def get_pair_data(self,pair_in,interval_in,**kwargs):
         return self.convert_to_df(self.client.continuous_klines(pair_in,contractType="PERPETUAL", interval=interval_in,limit=1000,**kwargs))
 
+    def update_all_data(self,pair_in,frequency:str):
+        desired_data = pd.read_csv(f'D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{frequency}.csv')
+        current_time = pd.to_datetime(self.client.time()["serverTime"],unit="ms").ceil("15min")
+        time_delta= current_time - pd.Timestamp(desired_data.iloc[-1]["Close Time"])
+        limit = time_delta / pd.Timedelta(frequency)
+        return limit
+
+            
     def convert_to_df(self, data):
         data_df=pd.DataFrame(np.asarray(data,dtype=np.float64),columns=["Open Time","Open","High","Low","Close","Volume","Close Time","Quote Asset Volume","Number of Trades","Taker Buy Volume","Taker Buy Quote Asset Volume","Ignore"])
         data_df['Open Time'] = pd.to_datetime(data_df['Open Time'], unit='ms')
