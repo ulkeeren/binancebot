@@ -2,6 +2,7 @@ from binance.um_futures import UMFutures
 import requests
 import pandas as pd
 import os
+import math
 from pandas_ta.volatility import atr
 from pandas_ta.volatility import donchian
 from pandas_ta.volatility import bbands
@@ -20,27 +21,81 @@ class DataGetter:
         if api_key != 0 and api_secret != 0:
             self.client = UMFutures("iPQMe46exUy10KiBaBahQT7ow1uzb9jaxlKj19Bg5BI8JEwJL5bw9LCvJtfKuVbP","J4FGJQdGPpNGm8jpnj3IuFuDJuAe7FIa3cM51L4z662UYux3qD0ByLJ0bfIltZvK")
 
-    def get_all_pair_data(self,**kwargs):
+    def fetch_whitelist_data(self):
+        intervals = ["1m","5m","15m","1h","4h"]
+        whitelist = open(r"D:\binanceapi\whitelist.txt")
+        for l in whitelist:
+            for interval in intervals:
+                self.get_all_pair_data_past(pair_in=l[:-1],interval_in=interval)
 
-        df = self.get_pair_data(**kwargs)
-        while True:
+    def replace_market_file(self,pair_in,interval_in):
+        os.remove(f"D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{interval_in}.csv")
+        os.rename(f"D:\\binanceapi\\{pair_in}_{interval_in}.csv", f"D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{interval_in}.csv")
+    
+    def delete_duplicates(self,pair_in,interval_in):
+        try:
+            df = pd.read_csv(f"D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{interval_in}.csv")
+            df=df.drop_duplicates(keep="last",subset = "Open Time")
+            df.to_csv(f"{pair_in}_{interval_in}.csv",index = False)
+            self.replace_market_file(pair_in,interval_in)
+
+        except FileNotFoundError:
+            pass
+        
+    def get_all_pair_data_past(self,**kwargs):
+        if not os.path.exists(f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv"):
+            print(f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv")
+            df=pd.DataFrame()
             try:
-                unix=self.datetime_to_unix(df["Open Time"])
-                df_before = self.get_pair_data("BTCUSDT",interval_in=kwargs["interval_in"],endTime=unix[0])
-                df=pd.concat([df_before,df],axis = 0)
+                df = self.get_pair_data(**kwargs)
             except:
-                break
-        return df
+                print(f"Can't fetch {kwargs["pair_in"]}")
+                return
+            while True:
+                try:
+                    unix=self.datetime_to_unix(df["Open Time"])
+                    df_before = self.get_pair_data("BTCUSDT",interval_in=kwargs["interval_in"],endTime=unix[0])
+                    df=pd.concat([df_before,df],axis = 0)
+                except:
+                    break
+            df.to_csv(f"{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv",index = False)
+            try:
+                os.rename(f"D:\\binanceapi\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv", f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv")
+            except FileNotFoundError:
+                os.makedirs(f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}")
+                os.rename(f"D:\\binanceapi\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv", f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv")
+            return df
 
     def get_pair_data(self,pair_in,interval_in,**kwargs):
         return self.convert_to_df(self.client.continuous_klines(pair_in,contractType="PERPETUAL", interval=interval_in,limit=1000,**kwargs))
 
-    def update_all_data(self,pair_in,frequency:str):
-        desired_data = pd.read_csv(f'D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{frequency}.csv')
-        current_time = pd.to_datetime(self.client.time()["serverTime"],unit="ms").ceil("15min")
-        time_delta= current_time - pd.Timestamp(desired_data.iloc[-1]["Close Time"])
-        limit = time_delta / pd.Timedelta(frequency)
-        return limit
+    def update_all_data(self):
+        whitelist = open(r"D:\binanceapi\whitelist.txt")
+        intervals = ["1m","5m","15m","1h","4h"]
+        flag = True
+        whitelist.seek(0)
+        df = pd.DataFrame()
+        for l in whitelist:
+            for interval in intervals:
+                try:
+                    desired_data = pd.read_csv(f"D:\\binanceapi\\MarketData\\{l[:-1]}\\{l[:-1]}_{interval}.csv")
+                except FileNotFoundError:
+                    flag = False
+                if flag:
+                    if interval.endswith("m"):
+                        current_time = pd.to_datetime(self.client.time()["serverTime"],unit="ms").floor(f"{interval}in")
+                    else:
+                        current_time = pd.to_datetime(self.client.time()["serverTime"],unit="ms").floor(f"{interval}")
+                    time_delta= current_time - pd.Timestamp(desired_data.iloc[-1]["Close Time"])
+                    limit = time_delta / pd.Timedelta(interval)
+                    for i in range(math.ceil(limit/1000)):
+                        df_late = self.get_pair_data(pair_in=l[:-1], interval_in=interval, endTime = current_time - i*1000*pd.Timedelta(interval))
+                        df=pd.concat([df_late,df],axis = 0)
+                    desired_data= pd.concat([desired_data,df],axis = 0)
+                    desired_data.drop_duplicates(keep="last",subset = "Open Time",inplace = True)
+                    desired_data.to_csv(f"{l[:-1]}_{interval}.csv",index = False)
+                    self.replace_market_file(pair_in=l[:-1], interval_in=interval)
+                    #TODO: Still not removing duplicates
 
             
     def convert_to_df(self, data):

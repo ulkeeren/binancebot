@@ -92,4 +92,5 @@ def optimize_strat(data_in,range_in,strat):
                 window = i
     if mpf == 0:
         return "Bad Strategy","Bad Strategy"
+        
     return mpf,window
