@@ -20,6 +20,7 @@ class DataGetter:
         self.api_secret = api_secret
         if api_key != 0 and api_secret != 0:
             self.client = UMFutures("iPQMe46exUy10KiBaBahQT7ow1uzb9jaxlKj19Bg5BI8JEwJL5bw9LCvJtfKuVbP","J4FGJQdGPpNGm8jpnj3IuFuDJuAe7FIa3cM51L4z662UYux3qD0ByLJ0bfIltZvK")
+    
 
     def fetch_whitelist_data(self):
         intervals = ["1m","5m","15m","1h","4h"]
@@ -28,20 +29,12 @@ class DataGetter:
             for interval in intervals:
                 self.get_all_pair_data_past(pair_in=l[:-1],interval_in=interval)
 
+
     def replace_market_file(self,pair_in,interval_in):
         os.remove(f"D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{interval_in}.csv")
         os.rename(f"D:\\binanceapi\\{pair_in}_{interval_in}.csv", f"D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{interval_in}.csv")
     
-    def delete_duplicates(self,pair_in,interval_in):
-        try:
-            df = pd.read_csv(f"D:\\binanceapi\\MarketData\\{pair_in}\\{pair_in}_{interval_in}.csv")
-            df=df.drop_duplicates(keep="last",subset = "Open Time")
-            df.to_csv(f"{pair_in}_{interval_in}.csv",index = False)
-            self.replace_market_file(pair_in,interval_in)
-
-        except FileNotFoundError:
-            pass
-        
+    
     def get_all_pair_data_past(self,**kwargs):
         if not os.path.exists(f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv"):
             print(f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv")
@@ -58,6 +51,7 @@ class DataGetter:
                     df=pd.concat([df_before,df],axis = 0)
                 except:
                     break
+
             df.to_csv(f"{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv",index = False)
             try:
                 os.rename(f"D:\\binanceapi\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv", f"D:\\binanceapi\\MarketData\\{kwargs["pair_in"]}\\{kwargs["pair_in"]}_{kwargs["interval_in"]}.csv")
@@ -68,36 +62,14 @@ class DataGetter:
 
     def get_pair_data(self,pair_in,interval_in,**kwargs):
         return self.convert_to_df(self.client.continuous_klines(pair_in,contractType="PERPETUAL", interval=interval_in,limit=1000,**kwargs))
-
-    def update_all_data(self):
-        whitelist = open(r"D:\binanceapi\whitelist.txt")
-        intervals = ["1m","5m","15m","1h","4h"]
-        flag = True
-        whitelist.seek(0)
-        df = pd.DataFrame()
-        for l in whitelist:
-            for interval in intervals:
-                try:
-                    desired_data = pd.read_csv(f"D:\\binanceapi\\MarketData\\{l[:-1]}\\{l[:-1]}_{interval}.csv")
-                except FileNotFoundError:
-                    flag = False
-                if flag:
-                    if interval.endswith("m"):
-                        current_time = pd.to_datetime(self.client.time()["serverTime"],unit="ms").floor(f"{interval}in")
-                    else:
-                        current_time = pd.to_datetime(self.client.time()["serverTime"],unit="ms").floor(f"{interval}")
-                    time_delta= current_time - pd.Timestamp(desired_data.iloc[-1]["Close Time"])
-                    limit = time_delta / pd.Timedelta(interval)
-                    for i in range(math.ceil(limit/1000)):
-                        df_late = self.get_pair_data(pair_in=l[:-1], interval_in=interval, endTime = current_time - i*1000*pd.Timedelta(interval))
-                        df=pd.concat([df_late,df],axis = 0)
-                    desired_data= pd.concat([desired_data,df],axis = 0)
-                    desired_data.drop_duplicates(keep="last",subset = "Open Time",inplace = True)
-                    desired_data.to_csv(f"{l[:-1]}_{interval}.csv",index = False)
-                    self.replace_market_file(pair_in=l[:-1], interval_in=interval)
-                    #TODO: Still not removing duplicates
-
-            
+    
+    def get_pair_data_past(self,pair_in,interval_in="1m",lenght=1000):
+        toy_data = data_getter.get_pair_data(pair_in,interval_in)
+        end_date = toy_data.iloc[0]["Open Time"]
+        for i in range(lenght):
+            toy_data = pd.concat([data_getter.get_pair_data(pair_in,interval_in,endTime=data_getter.datetime_to_unix(toy_data.iloc[0]["Open Time"])),toy_data])
+        return toy_data
+       
     def convert_to_df(self, data):
         data_df=pd.DataFrame(np.asarray(data,dtype=np.float64),columns=["Open Time","Open","High","Low","Close","Volume","Close Time","Quote Asset Volume","Number of Trades","Taker Buy Volume","Taker Buy Quote Asset Volume","Ignore"])
         data_df['Open Time'] = pd.to_datetime(data_df['Open Time'], unit='ms')
@@ -120,128 +92,6 @@ class DataGetter:
         if response.status_code == 200:
             exchange_info = response.json()
             return [symbol["symbol"] for symbol in exchange_info['symbols']]
-
-    
-
-    def low_swings(self,data_in,order=2):
-        low_swing_list = []
-        for i in range(order,len(data_in)-order):
-            flag = True
-            for j in range(1,order+1):
-                if data_in.iloc[i]["Low"] > data_in.iloc[i+j]["Low"] or data_in.iloc[i]["Low"] > data_in.iloc[i-j]["Low"]:
-                    flag=False
-                    break
-            if flag == True:
-                low_swing_list.append(data_in.iloc[i]["Index"])
-            
-        return low_swing_list
-    
-    def high_swings(self,data_in,order=2):
-        high_swing_list = []
-        for i in range(order,len(data_in)-order):
-            flag = True
-            for j in range(1,order+1):
-                if data_in.iloc[i]["High"] < data_in.iloc[i+j]["High"] or data_in.iloc[i]["High"] < data_in.iloc[i-j]["High"]:
-                    flag=False
-                    break
-            if flag == True:
-                high_swing_list.append(data_in.iloc[i]["Index"])
-            
-        return high_swing_list
-
-    def line_opt(self,line,data_in,mode="Low"):
-        #line: list containing slope [0] and intercept [1] of a  line
-        dif_list = data_in[mode] - (line[0]*data_in[mode]+line[1])
-        min_dif_idx = dif_list.argmin()
-        min_dif = dif_list.iloc[min_dif_idx]
-        return [(min_dif/min_dif_idx) - line[0] , line[1]] 
-    
-    def init_line(self, data_in,mode_in="Low"):
-        #TODO: gives a decent line but needs optimization
-        reg = LinearRegression()
-        #X=np.arange(len(data_in)).reshape(-1, 1)
-        X=data_in["Index"].values.reshape(-1, 1)
-        y=data_in[mode_in].values.reshape(-1,1)
-        reg.fit(X,y)
-        return reg.coef_[0][0],reg.intercept_[0]
-        
-    #TODO: Herhangi bir candlestickin open-close arasından geçiyor bir line onun kontrolünü yapan fonksiyon
-    def check_oc_collision_of_single_candlestick(self,arg,line,mode="Open Time"):
-        """
-        input
-            arg: bir pandas dataframeinin rowu da olabilir (pandas.core.series.Series),    
-                  index de olabilir (int),
-                  tarih de olabilir (pandas._libs.tslibs.timestamps.Timestamp)
-                bunu şimdilik bir trendline çizdiğimizde trendline başlangiç mumundan itibaren ilerdeki diğer mumlarla çakişip çakişmadiğini bir for loop içinde
-                bulmak için kullanicaz,
-                TODO: ileride bunu trendline başlangic mumunu tespit edebildiğimde trendline mumunu doğrulamak için kullanicaz
-
-            line:
-                regresyon sonucu elde ettiğimiz slope ve intercept, slope'u indexle çarpinca regresyon linei çikiyor.
-                yani diğer data tiplerini timestampe çevirmek lazim
-            mode:
-                Open Time ya da Close Time'a göre algoritmayi çaliştirmak için aldiğimiz bir parametre
-        """
-        idx = 0
-        #dataframe row case
-        if type(arg) == "pandas.core.series.Series":
-            idx = self.data[self.data["Open Time"] == arg["Open Time"]]["Index"]
-
-        #int case
-        elif type(arg) == "int":
-            idx=arg
-
-        #timestamp case
-        elif type(arg)=="pandas._libs.tslibs.timestamps.Timestamp":
-            idx = self.data[self.data["Open Time"] == arg].index
-        
-        return (    [self.data.iloc[idx]["Open Time"] ,self.data.iloc[idx]["Close"] <= line[0]*idx+line[1] <= self.data.iloc[idx]["Open"] 
-                    or
-                    self.data.iloc[idx]["Open"] <= line[0]*idx+line[1] <= self.data.iloc[idx]["Close"]]    
-                )
-    
-    def check_oc_collisions(self,begin,end,line):
-        collision_list = [] #bu liste [bool,timestamp] veri türünde olacak şekilde candlesticklerin istenen linela çakışıp çakışmadığını tutacak 
-        begin_idx = begin
-        while begin_idx != end+1:
-            collision_list.append(self.check_oc_collision_of_single_candlestick(begin_idx,line))
-            begin_idx += 1
-
-        return collision_list
-    
-    def find_support_in_chunk(self,data_in,order=15):
-        smallest_15 = data_in.nsmallest(order,"Low")
-        return np.sum(smallest_15["Low"].values.reshape(-1,1)) / order 
-        #average_order = np.sum(smallest_15["Low"].values.reshape(-1,1)) / order
-        #return smallest_15.nsmallest(1,"Index").iloc[0], smallest_15.nlargest(1,"Index").iloc[0], average_order
-
-    def find_resistance_in_chunk(self,data_in,order=15):
-        largest_15 = data_in.nlargest(order,"High")
-        return np.sum(largest_15["High"].values.reshape(-1,1)) / order
-        #average_order = np.sum(largest_15["High"].values.reshape(-1,1)) / order
-        #return largest_15.nsmallest(1,"Index").iloc[0], largest_15.nlargest(1,"Index").iloc[0], average_order
-    
-    def find_sr_info(self,data_in,order = 15,chunk_size = 100):
-        support_info = {
-            "order" : order,
-            "chunk_size" : chunk_size,
-            "chunk_begins_n_ends" : [] #chunk beginning candle time, chunk ending candle time, value    
-        }
-        resistance_info = {
-            "order" : order,
-            "chunk_size" : chunk_size,
-            "chunk_begins_n_ends" : [] #chunk beginning candle time, chunk ending candle time, value    
-        }
-
-        for i in range(chunk_size,len(data_in)):
-            support_info["chunk_begins_n_ends"].append([data_in.iloc[i-chunk_size],data_in.iloc[i],self.find_support_in_chunk(data_in.iloc[i-chunk_size : i])])
-            resistance_info["chunk_begins_n_ends"].append([data_in.iloc[i-chunk_size],data_in.iloc[i],self.find_resistance_in_chunk(data_in.iloc[i-chunk_size : i])])
-            
-        return support_info, resistance_info
-
-    def isIncreasing(self,data_in):
-        midPoints = (data_in["Close"] + data_in["Open"])/2
-
     
     """
     def get_pair_data(self,pair,interval,limit=500):
@@ -255,6 +105,13 @@ class DataGetter:
         return self.convert_to_df(requests.get("https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval={interval}&limit={limit}").json())
     """
     
+
+
+
+
+    """
+    Indicator returning functions
+    """
     def ema(self,data_in,mode_in="Low", order = 15):
         line_values = []
         dates = []
